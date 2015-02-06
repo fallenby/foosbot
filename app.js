@@ -8,7 +8,8 @@
 // 	node simple.js
 
 var Slack = require('slack-client');
-var Mongo = require('mongodb');
+var Mongo = require('mongodb'),
+    ObjectID = require('mongodb').ObjectID;
 
 var token = 'xoxb-3600011794-P3pR190loOzHdpX21lM20V5o', // Add a bot at https://my.slack.com/services/new/bot and copy the token here.
     autoReconnect = true,
@@ -19,12 +20,22 @@ var token = 'xoxb-3600011794-P3pR190loOzHdpX21lM20V5o', // Add a bot at https://
         collections: [
             'team',
             'player',
-            'game'
+            'match'
         ],
         client: null
     },
     commands = {
         beat: new CommandHandler(beat),
+        help: new CommandHandler(help),
+        please: new CommandGroup({
+            help: new CommandHandler(pleaseHelp)
+        }),
+        lost: new CommandGroup({
+            to: new CommandHandler(lostTo)
+        }),
+        won: new CommandGroup({
+            againt: new CommandHandler(beat)
+        }),
         add: new CommandGroup({
             team: new CommandGroup({
                 with: new CommandGroup({
@@ -152,29 +163,58 @@ function executeCommand(textArray, routes, arguments)
         if (typeof routes['_default'] != 'undefined')
             return routes['_default'].execute(textArray.concat(arguments));
 
-        return 'invalid command';
+        slack.sendToChannel("I'm sorry, I don't know how to respond to that command. Ask me for help if you are stuck.");
     }
 
-    return 'invalid command';
+    slack.sendToChannel("I'm sorry, I don't know how to respond to that command. Ask me for help if you are stuck.");
+}
+
+function help(params)
+{
+    var responses = [
+            "what's the magic word?",
+            "ask me nicely.",
+            "say please.",
+            "you're very rude. Try asking me again nicely",
+            "what do I look like to you, a robot? Say please.",
+            "I have feelings, you know. Try being polite."
+        ];
+
+    slack.sendToChannel(responses[Math.floor(Math.random() * responses.length)]);
+}
+
+function pleaseHelp(params)
+{
+    slack.sendToChannel("no.");
 }
 
 function addPlayer(params)
 {
-    db.client.collection('player').insert({name: params.join(' ')}, function(err, result) {
-        if (err)
-            slack.sendToChannel("I'm sorry, I wasn't able to add the player " + params.join(' ') + " for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
+    var player = new Player({
+        id: new ObjectID(),
+        name: params.join(' ')
+    });
 
-        slack.sendToChannel("I added the player \"" + params.join(' ') + "\" for you. You'll need to add them to a team now.");
+    db.client.collection('player').insert(player, function(err, result) {
+        if (err)
+            slack.sendToChannel("I'm sorry, I wasn't able to add the player " + result[0].name + " for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
+
+        slack.sendToChannel("I added the player \"" + result[0].name + "\" for you. You'll need to add them to a team now.");
     });
 }
 
 function addTeam(params)
 {
-    db.client.collection('team').insert({name: params.join(' ')}, function(err, result) {
-        if (err)
-            slack.sendToChannel("I'm sorry, I wasn't able to add the team " + params.join(' ') + " for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
+    var team = new Team({
+        id: new ObjectID(),
+        name: params.join(' ')
+    });
 
-        slack.sendToChannel("I have added the team \"" + params.join(' ') + "\" for you. You'll need to add some players to it now.");
+    db.client.collection('team').insert(team, function(err, result) {
+        if (err)
+            slack.sendToChannel("I'm sorry, I wasn't able to add the team " + result[0].name + " for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
+
+        slack.sendToChannel("I have added the team \"" + result[0].name + "\" for you. You'll need to add some players to it now.");
     });
 }
 
@@ -194,6 +234,44 @@ function beat(params)
     slack.sendToChannel(params[0] + " beat " + params[1]);
 }
 
+function lostTo(params)
+{
+    slack.sendToChannel(params[0] + " lost to " + params[1]);
+}
+
+function listPlayers(params)
+{
+    db.client.collection('player').find().toArray(function(err, items) {
+        if (err)
+            slack.sendToChannel("I'm sorry, I wasn't able to list the players for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
+
+        var players = '';
+        for (key in items)
+        {
+           players += "\n";
+           players += items[key].name; 
+        }
+
+        slack.sendToChannel("the current players are:" + players);
+    });
+}
+
+function listTeams(params)
+{
+    db.client.collection('team').find().toArray(function(err, items) {
+        if (err)
+            slack.sendToChannel("I'm sorry, I wasn't able to list the teams for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
+
+        var teams = '';
+        for (key in items)
+        {
+           teams += "\n";
+           teams += items[key].name; 
+        }
+
+        slack.sendToChannel("the current teams are:" + teams);
+    });
+}
 function listTeams(params)
 {
     db.client.collection('team').find().toArray(function(err, items) {
@@ -230,6 +308,70 @@ function CommandGroup(commands)
 
     if (this.commands === null)
         throw "No command group commands";
+}
+
+function Player(options)
+{
+    this.id = options['id'] || null;
+
+    if (this.id === null)
+        throw "Coult not create player; player ID not specified";
+
+    this.name = options['name'] || null;
+
+    if (this.name === null)
+        throw "Could not create player; player name not specified";
+}
+
+function Team(options)
+{
+    this.id = options['id'] || null;
+
+    if (this.id === null)
+        throw "Count not create team; team ID not specified";
+
+    this.name = options['name'] || null;
+
+    if (this.name === null)
+        throw "Count not create team; team name not specified";
+
+    this.players = options['players'] || [];
+
+    if (this.players.length > 0 && this.players.length != 2)
+        throw "Could not create team; team can only have two players";
+
+    this.addPlayer = function(playerID) {
+        if (players.length >= 2)
+            throw "Could not add player to team; team can only have two players";
+
+        players.push(playerId);
+    }
+}
+
+function Match(options)
+{
+    this.id = options['id'] || null;
+
+    if (this.id === null)
+        throw "Count not create match; match ID not specified";
+
+    this.teams = options['teams'] || [];
+
+    if (this.teams.length > 0 && this.teams.length != 2)
+        throw "Could not create match; match can only have two teams";
+
+    this.addTeam = function(teamId) {
+        if (teams.length >= 2)
+            throw "Could not add team to match; match can only have two teams";
+
+        teams.push(teamId);
+    }
+
+    this.winner = options['winner'] || null;
+
+    this.setWinner = function(teamId) {
+        winner = teamId;
+    }
 }
 
 slack.login();
