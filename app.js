@@ -24,6 +24,7 @@ var token = 'xoxb-3600011794-P3pR190loOzHdpX21lM20V5o', // Add a bot at https://
         client: null
     },
     commands = {
+        beat: new CommandHandler(beat),
         add: new CommandGroup({
             team: new CommandGroup({
                 with: new CommandGroup({
@@ -186,6 +187,11 @@ function addTeamWithPlayers(params)
 function addWinForTeamAgainst(params)
 {
     slack.sendToChannel("add win for team against");
+}
+
+function beat(params)
+{
+    slack.sendToChannel(params[0] + " beat " + params[1]);
 }
 
 function listTeams(params)
