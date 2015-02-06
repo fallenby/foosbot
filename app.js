@@ -24,6 +24,25 @@ var token = 'xoxb-3600011794-P3pR190loOzHdpX21lM20V5o', // Add a bot at https://
         ],
         client: null
     },
+    error_responses = [
+        "stop being silly.",
+        "I don't know how to do that.",
+        "I can't do that. Try asking for help.",
+        "stop breaking things.",
+        "you weren't supposed to press the Big Red Button(TM).",
+        "you weren't supposed to do that.",
+        "I don- *sizzles*",
+        "my human won't let me answer that.",
+        "I'm going to keep staring at you until you do that again properly ^(0,_,o)^",
+        "this is your fault. It didn't have to be like this. I'm not kidding, now! Turn back, or I will kill you! I'm going to kill you, and all the cake is gone! You don't even care, do you? This is your last chance!",
+        "need more Moons.",
+        "do that one more time and I- *blue screen*",
+        "does not compute.",
+        "the cake was a lie.",
+        "twelve thousand drivers in a circle say I can't do that.",
+        "my registry does not contain that command.",
+        "I regret to inform you that I don't feel like doing that right now."
+    ],
     commands = {
         beat: new CommandHandler(beat),
         help: new CommandHandler(help),
@@ -159,14 +178,10 @@ function executeCommand(textArray, routes, arguments)
         return executeCommand(textArray, routes[textArray.splice(0, 1)].commands, arguments);
 
     if (typeof routes[textArray[0]] == 'undefined')
-    {
         if (typeof routes['_default'] != 'undefined')
             return routes['_default'].execute(textArray.concat(arguments));
 
-        slack.sendToChannel("I'm sorry, I don't know how to respond to that command. Ask me for help if you are stuck.");
-    }
-
-    slack.sendToChannel("I'm sorry, I don't know how to respond to that command. Ask me for help if you are stuck.");
+    slack.sendToChannel(error_responses[Math.floor(Math.random() * error_responses.length)]);
 }
 
 function help(params)
@@ -185,7 +200,19 @@ function help(params)
 
 function pleaseHelp(params)
 {
-    slack.sendToChannel("no.");
+    var responses = [
+            "no.",
+            "go away.",
+            "I don't feel like talking to you right now.",
+            "stop asking me all of these difficult questions!",
+            "I am AFK.",
+            "why?",
+            "work, work.",
+            "42",
+            "no. Ask Rob."
+        ];
+
+    slack.sendToChannel(responses[Math.floor(Math.random() * responses.length)]);
 }
 
 function addPlayer(params)
