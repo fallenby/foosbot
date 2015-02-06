@@ -111,13 +111,10 @@ slack.on('message', function(message) {
 
         var command_arguments = [];
 
-        // Grab arguments between quotes
         text = text.replace(/"([^"]*)"/g, function(m, p1) {
             command_arguments.push(p1);
             return '';
         });
-        text = text.replace(/\s{2,}/g, ' '); // Remove double spaces
-        text = text.replace(',', ''); // Remove rogue commas
 
         text = text.trim();
 
