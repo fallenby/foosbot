@@ -115,8 +115,8 @@ slack.on('open', function() {
         }
     }
 
-    slack.sendToChannel = function(text) {
-        this.message.channel.send('<@' + this.message.user.id + '>, ' + text);
+    slack.sendToChannel = function(text, extra) {
+        this.message.channel.send('<@' + this.message.user.id + '>, ' + text + (extra != null ? "\n>" +extra.join("\n>") : ''));
         console.log('@%s sent message "%s"', slack.self.name, text);
     }
 
@@ -134,7 +134,7 @@ slack.on('message', function(message) {
         text = message.text,
             response = '';
 
-    console.log('Received: %s %s @%s %s "%s"', type, (channel.is_channel ? '#' : '') + channel.name, user.name, time, text);
+    console.log('Received: %s %s @%s %s "%s"', type, (channel.is_channel ? '#' : '') + channel.name, (user.name != null ? user.name : ''), time, text);
 
     if (type === 'message') {
         if (text.split(' ')[0] != ('<@' + slack.self.id + '>'))
@@ -289,30 +289,13 @@ function listTeams(params)
         if (err)
             slack.sendToChannel("I'm sorry, I wasn't able to list the teams for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
 
-        var teams = '';
+        var teams = [];
         for (key in items)
         {
-           teams += "\n";
-           teams += items[key].name; 
+           teams.push(Text(items[key].name).bold().italic().point().val());
         }
 
-        slack.sendToChannel("the current teams are:" + teams);
-    });
-}
-function listTeams(params)
-{
-    db.client.collection('team').find().toArray(function(err, items) {
-        if (err)
-            slack.sendToChannel("I'm sorry, I wasn't able to list the teams for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
-
-        var teams = '';
-        for (key in items)
-        {
-           teams += "\n";
-           teams += items[key].name; 
-        }
-
-        slack.sendToChannel("the current teams are:" + teams);
+        slack.sendToChannel("the current teams are:", teams);
     });
 }
 
@@ -399,6 +382,36 @@ function Match(options)
     this.setWinner = function(teamId) {
         winner = teamId;
     }
+}
+
+function Text(text)
+{
+    this.text = text || null;
+
+    if (this.text == null)
+        throw "No text to operate on.";
+
+    this.bold = function()
+    {
+        return Text('*' + this.text + '*');
+    }
+
+    this.italic = function()
+    {
+        return Text('_' + this.text + '_');
+    }
+
+    this.point = function()
+    {
+        return Text('- ' + this.text);
+    }
+
+    this.val = function()
+    {
+        return this.text;
+    }
+
+    return this;
 }
 
 slack.login();
