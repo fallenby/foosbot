@@ -8,8 +8,7 @@
 // 	node simple.js
 
 var Slack = require('slack-client');
-var Mongo = require('mongodb'),
-    ObjectID = require('mongodb').ObjectID;
+var Mongo = require('mongodb');
 
 var token = 'xoxb-3600011794-P3pR190loOzHdpX21lM20V5o', // Add a bot at https://my.slack.com/services/new/bot and copy the token here.
     autoReconnect = true,
@@ -47,7 +46,33 @@ var token = 'xoxb-3600011794-P3pR190loOzHdpX21lM20V5o', // Add a bot at https://
         beat: new CommandHandler(beat),
         help: new CommandHandler(help),
         please: new CommandGroup({
-            help: new CommandHandler(pleaseHelp)
+            help: new CommandHandler(pleaseHelp),
+            list: new CommandGroup({
+                teams: new CommandHandler(listTeams),
+                players: new CommandHandler(listPlayers),
+                matches: new CommandHandler(listMatches)
+            }),
+            add: new CommandGroup({
+                team: new CommandGroup({
+                    with: new CommandGroup({
+                        players: new CommandHandler(addTeamWithPlayers)
+                    }),
+                    _default: new CommandHandler(addTeam)
+                }),
+                a: new CommandGroup({
+                    win: new CommandGroup({
+                        for: new CommandGroup({
+                            against: new CommandHandler(beat)
+                        })
+                    }),
+                    loss: new CommandGroup({
+                        for: new CommandGroup({
+                            against: new CommandHandler(lostTo)
+                        })
+                    })
+                }),
+                player: new CommandHandler(addPlayer)
+            })
         }),
         lost: new CommandGroup({
             to: new CommandHandler(lostTo)
@@ -55,23 +80,8 @@ var token = 'xoxb-3600011794-P3pR190loOzHdpX21lM20V5o', // Add a bot at https://
         won: new CommandGroup({
             againt: new CommandHandler(beat)
         }),
-        add: new CommandGroup({
-            team: new CommandGroup({
-                with: new CommandGroup({
-                    players: new CommandHandler(addTeamWithPlayers)
-                }),
-               _default: new CommandHandler(addTeam)
-            }),
-            win: new CommandGroup({
-                for: new CommandGroup({
-                    against: new CommandHandler(addWinForTeamAgainst)
-                })
-            }),
-            player: new CommandHandler(addPlayer)
-        }),
-        list: new CommandGroup({
-            teams: new CommandHandler(listTeams)
-        })
+        hello: new CommandHandler(hello),
+        ping: new CommandHandler(ping)
     }
 
 var slack = new Slack(token, autoReconnect, autoMark);
@@ -83,25 +93,25 @@ slack.on('open', function() {
         key;
 
     Mongo.connect('mongodb://localhost:27017/foosbot', function(err, database) {
-        if (err)
+            if (err)
             console.log("Error connecting to database");
 
-        console.log("");
-        console.log("Connected to database");
+            console.log("");
+            console.log("Connected to database");
 
-        db.client = database;
+            db.client = database;
 
-        console.log("Initializing database");
-        for (key in db.collections)
-        {
-            db.client.createCollection(db.collections[key], function(err, coll) {
-                if (err)
-                    console.log("Error creating '%s' collection", coll.collectionName);
+            console.log("Initializing database");
+            for (key in db.collections)
+            {
+                db.client.createCollection(db.collections[key], function(err, coll) {
+                    if (err)
+                        console.log("Error creating '%s' collection", coll.collectionName);
 
-                console.log("Created '%s' collection", coll.collectionName);
+                    console.log("Created '%s' collection", coll.collectionName);
+                });
+            }
             });
-        }
-    });
 
     for (key in slack.channels) {
         if (slack.channels[key].is_member) {
@@ -144,9 +154,9 @@ slack.on('message', function(message) {
 
         // Grab arguments between quotes
         text = text.replace(/"([^"]*)"/g, function(m, p1) {
-            command_arguments.push(p1);
-            return '';
-        });
+                command_arguments.push(p1);
+                return '';
+                });
         text = text.replace(/\s{2,}/g, ' '); // Remove double spaces
         text = text.replace(',', ''); // Remove rogue commas
 
@@ -187,13 +197,13 @@ function executeCommand(textArray, routes, arguments)
 function help(params)
 {
     var responses = [
-            "what's the magic word?",
-            "ask me nicely.",
-            "say please.",
+        "what's the magic word?",
+        "ask me nicely.",
+        "say please.",
             "you're very rude. Try asking me again nicely",
             "what do I look like to you, a robot? Say please.",
-            "I have feelings, you know. Try being polite."
-        ];
+                "I have feelings, you know. Try being polite."
+    ];
 
     slack.sendToChannel(responses[Math.floor(Math.random() * responses.length)]);
 }
@@ -201,16 +211,16 @@ function help(params)
 function pleaseHelp(params)
 {
     var responses = [
-            "no.",
-            "go away.",
-            "I don't feel like talking to you right now.",
+        "no.",
+        "go away.",
+        "I don't feel like talking to you right now.",
             "stop asking me all of these difficult questions!",
             "I am AFK.",
-            "why?",
-            "work, work.",
-            "42",
-            "no. Ask Rob."
-        ];
+                "why?",
+                "work, work.",
+                    "42",
+                    "no. Ask Rob."
+    ];
 
     slack.sendToChannel(responses[Math.floor(Math.random() * responses.length)]);
 }
@@ -218,7 +228,6 @@ function pleaseHelp(params)
 function addPlayer(params)
 {
     var player = new Player({
-        id: new ObjectID(),
         name: params.join(' ')
     });
 
@@ -233,7 +242,6 @@ function addPlayer(params)
 function addTeam(params)
 {
     var team = new Team({
-        id: new ObjectID(),
         name: params.join(' ')
     });
 
@@ -258,12 +266,83 @@ function addWinForTeamAgainst(params)
 
 function beat(params)
 {
-    slack.sendToChannel(params[0] + " beat " + params[1]);
+    db.client.collection('team').find({ name: {"$in": [params[0], params[1]] } }).toArray(function(err, items) {
+        if (err)
+            slack.sendToChannel("I'm sorry, I wasn't able to add a win for that team for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
+
+        if (items.length != 2)
+        {
+            var badTeam = '';
+            if (items[0].name != params[0])
+                badTeam = params[0];
+            else
+                badTeam = params[1];
+
+            slack.sendToChannel('I wasn\'t able to find the team "' + badTeam + '". Please make sure you didn\'t bugger the spelling up, you idiot.');
+            return;
+        }
+
+        var match = new Match({
+            teams: [items[0]._id, items[1]._id],
+            winner: items[0]._id
+        });
+
+        db.client.collection('match').insert(match, function(err, result) {
+            if (err)
+                slack.sendToChannel("I'm sorry, I wasn't able to add a win for that team for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
+
+            slack.sendToChannel('I added a win for "' + params[0] + '" against "' + params[1] + '"');
+        });
+    });
 }
 
 function lostTo(params)
 {
-    slack.sendToChannel(params[0] + " lost to " + params[1]);
+    db.client.collection('team').find({ name: {"$in": [params[0], params[1]] } }).toArray(function(err, items) {
+        if (err)
+            slack.sendToChannel("I'm sorry, I wasn't able to add a loss for that team for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
+
+        if (items.length != 2)
+        {
+            var badTeam = '';
+            if (items[0].name != params[0])
+                badTeam = params[0];
+            else
+                badTeam = params[1];
+
+            slack.sendToChannel('I wasn\'t able to find the team "' + badTeam + '". Please make sure you didn\'t bugger the spelling up, you idiot.');
+            return;
+        }
+
+        var match = new Match({
+            teams: [items[0]._id, items[1]._id],
+            winner: items[1]._id
+        });
+
+        db.client.collection('match').insert(match, function(err, result) {
+            if (err)
+                slack.sendToChannel("I'm sorry, I wasn't able to add a loss to that team for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
+
+            slack.sendToChannel('I added a loss for "' + params[0] + '" against "' + params[1] + '"');
+        });
+    });
+}
+
+function listMatches(params)
+{
+    db.client.collection('match').find().toArray(function(err, items) {
+        if (err)
+            slack.sendToChannel("I'm sorry, I wasn't able to list the players for you. Please give it another shot or tell Frank to stop being a moron if it still doesn't work.");
+
+        var matches = '';
+        for (key in items)
+        {
+            matches += "\n";
+            matches += JSON.stringify(items[key]);
+        }
+
+        slack.sendToChannel("the current matches are:" + matches);
+    });
 }
 
 function listPlayers(params)
@@ -275,8 +354,8 @@ function listPlayers(params)
         var players = '';
         for (key in items)
         {
-           players += "\n";
-           players += items[key].name; 
+            players += "\n";
+            players += items[key].name; 
         }
 
         slack.sendToChannel("the current players are:" + players);
@@ -292,11 +371,21 @@ function listTeams(params)
         var teams = [];
         for (key in items)
         {
-           teams.push(Text(items[key].name).bold().italic().point().val());
+            teams.push(new Text(items[key].name).bold().italic().point().val());
         }
 
         slack.sendToChannel("the current teams are:", teams);
     });
+}
+
+function hello(params)
+{
+    slack.sendToChannel("hello!");
+}
+
+function ping(params)
+{
+    slack.sendToChannel("pong!");
 }
 
 function CommandHandler(handler)
@@ -322,11 +411,6 @@ function CommandGroup(commands)
 
 function Player(options)
 {
-    this.id = options['id'] || null;
-
-    if (this.id === null)
-        throw "Coult not create player; player ID not specified";
-
     this.name = options['name'] || null;
 
     if (this.name === null)
@@ -335,11 +419,6 @@ function Player(options)
 
 function Team(options)
 {
-    this.id = options['id'] || null;
-
-    if (this.id === null)
-        throw "Count not create team; team ID not specified";
-
     this.name = options['name'] || null;
 
     if (this.name === null)
@@ -360,11 +439,6 @@ function Team(options)
 
 function Match(options)
 {
-    this.id = options['id'] || null;
-
-    if (this.id === null)
-        throw "Count not create match; match ID not specified";
-
     this.teams = options['teams'] || [];
 
     if (this.teams.length > 0 && this.teams.length != 2)
@@ -393,25 +467,23 @@ function Text(text)
 
     this.bold = function()
     {
-        return Text('*' + this.text + '*');
+        return new Text('*' + this.text + '*');
     }
 
     this.italic = function()
     {
-        return Text('_' + this.text + '_');
+        return new Text('_' + this.text + '_');
     }
 
     this.point = function()
     {
-        return Text('- ' + this.text);
+        return new Text('- ' + this.text);
     }
 
     this.val = function()
     {
         return this.text;
     }
-
-    return this;
 }
 
 slack.login();
